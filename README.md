@@ -208,3 +208,12 @@ pip install -r requirements.txt
 Этот проект предоставляется "как есть". Автор не несет ответственности за любые последствия использования. Используйте с умом и в соответствии с правилами игры.
 
 **Удачи в рыбалке! 🎣**
+SEO: albion-online, fishing-bot, python, automation, opencv, game-bot, 
+pyautogui, computer-vision, game-automation, windows-bot
+albion-online albion fishing-bot
+python-bot automation game-automation
+opencv computer-vision image-processing
+python pyautogui pyaudio
+dearpygui gui-automation windows-automation
+game-bot fishing minigame-solver
+bot-development auto-fishing mmo-automation
