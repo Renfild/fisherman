@@ -205,26 +205,38 @@ class FishingMetrics:
             
     def get_downtime(self) -> float:
         """Получить время простоя"""
-        return self.get_total_time() - self.get_uptime()
+        total = self.get_total_time()
+        up = self.get_uptime()
+        return total - up
         
     def get_stats_dict(self) -> Dict:
         """Получить все статистики в виде словаря"""
+        # Call methods that use locks first, before acquiring lock
+        fish_per_hour = self.get_fish_per_hour()
+        success_rate = self.get_success_rate()
+        avg_catch_time = self.get_average_catch_time()
+        uptime = self.get_uptime()
+        total_time = self.get_total_time()
+        downtime = total_time - uptime
+        mastery_title = self.get_mastery_title()
+        mastery_progress = self.get_mastery_progress()
+        
         with self.lock:
             return {
                 'total_catches': self.total_catches,
                 'total_attempts': self.total_attempts,
                 'total_failures': self.total_failures,
-                'fish_per_hour': self.get_fish_per_hour(),
-                'success_rate': self.get_success_rate(),
-                'average_catch_time': self.get_average_catch_time(),
-                'uptime': self.get_uptime(),
-                'downtime': self.get_downtime(),
-                'total_time': self.get_total_time(),
+                'fish_per_hour': fish_per_hour,
+                'success_rate': success_rate,
+                'average_catch_time': avg_catch_time,
+                'uptime': uptime,
+                'downtime': downtime,
+                'total_time': total_time,
                 'current_volume': self.current_volume,
                 'audio_spectrum': self.audio_spectrum[:],
                 'mastery_level': self.mastery_level,
-                'mastery_title': self.get_mastery_title(),
-                'mastery_progress': self.get_mastery_progress(),
+                'mastery_title': mastery_title,
+                'mastery_progress': mastery_progress,
                 'mastery_exp': self.mastery_exp,
                 'estimated_value': self.estimated_value,
             }
