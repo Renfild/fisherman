@@ -1,6 +1,18 @@
 import pyautogui, pyaudio, audioop, threading, time, win32api, configparser, mss, cv2, numpy, os, random
 import dearpygui.dearpygui as dpg
 
+# Gaming Dashboard imports
+try:
+    from metrics import metrics as fishing_metrics
+    from dashboard import create_dashboard
+    from sounds import sound_manager
+    DASHBOARD_AVAILABLE = True
+except ImportError as e:
+    print(f"Dashboard not available: {e}")
+    DASHBOARD_AVAILABLE = False
+    fishing_metrics = None
+    sound_manager = None
+
 # Настройки стабильности
 pyautogui.PAUSE = 0.05
 pyautogui.FAILSAFE = True
@@ -50,6 +62,10 @@ coords, bait_step1, bait_step2, move_spot = [], None, None, None
 screen_area = {"left": 0, "top": 0, "width": 400, "height": 100}
 bobber_img = cv2.imread('bobber.png') if os.path.exists('bobber.png') else None
 
+# Dashboard
+show_dashboard = False
+dashboard_instance = None
+
 def log_info(msg):
     if dpg.is_dearpygui_running():
         dpg.add_text(f"[{time.strftime('%H:%M:%S')}] {msg}", parent="log_group")
@@ -83,6 +99,9 @@ def Detect_Bobber():
 
 def mini_game_logic():
     log_info("Mini-game started...")
+    if DASHBOARD_AVAILABLE and fishing_metrics:
+        fishing_metrics.start_attempt()
+    
     start_time = time.time()
     last_seen = time.time()
     
@@ -97,6 +116,8 @@ def mini_game_logic():
             # Если поплавок не виден более 3 секунд — это ошибка, перезапускаем
             if time.time() - last_seen > 3.0:
                 log_info("LOST BOBBER! Resetting cycle...")
+                if DASHBOARD_AVAILABLE and fishing_metrics:
+                    fishing_metrics.record_catch(success=False)
                 break
         time.sleep(0.01)
         
@@ -148,13 +169,74 @@ def audio_loop():
         try:
             data = stream.read(1024, False)
             vol = audioop.max(data, 2); total_vol = vol
+            
+            # Update metrics
+            if DASHBOARD_AVAILABLE and fishing_metrics:
+                fishing_metrics.update_volume(vol)
+            
             if vol > dpg.get_value("vol_input"):
                 time.sleep(0.5); STATE = "SOLVING"
+                
+                # Play bite sound
+                if DASHBOARD_AVAILABLE and sound_manager:
+                    sound_manager.play_bite_sound()
+                
                 pyautogui.click(); time.sleep(0.3)
                 mini_game_logic()
-                fish_count += 1; STATE = "CASTING"
+                fish_count += 1
+                
+                # Record successful catch
+                if DASHBOARD_AVAILABLE and fishing_metrics:
+                    fishing_metrics.record_catch(success=True)
+                    if sound_manager:
+                        sound_manager.play_catch_sound()
+                
+                STATE = "CASTING"
         except: pass
     stream.stop_stream(); p.terminate()
+
+# ==========================================
+# DASHBOARD FUNCTIONS
+# ==========================================
+
+def toggle_dashboard():
+    """Переключить отображение дашборда"""
+    global show_dashboard, dashboard_instance
+    show_dashboard = not show_dashboard
+    
+    if show_dashboard and DASHBOARD_AVAILABLE:
+        if dashboard_instance is None:
+            dashboard_instance = create_dashboard(fishing_metrics)
+            if sound_manager:
+                sound_manager.play_startup_sound()
+        log_info("Dashboard ENABLED")
+    else:
+        log_info("Dashboard DISABLED")
+
+def start_bot_with_metrics():
+    """Запустить бота с отслеживанием метрик"""
+    global STATE, stop_button
+    STATE = "STARTED"
+    stop_button = False
+    
+    if DASHBOARD_AVAILABLE and fishing_metrics:
+        fishing_metrics.start_session()
+    
+    threading.Thread(target=audio_loop, daemon=True).start()
+    threading.Thread(target=action_loop, daemon=True).start()
+    
+    log_info("Bot STARTED with metrics tracking")
+
+def stop_bot_with_metrics():
+    """Остановить бота"""
+    global stop_button, STATE
+    stop_button = True
+    STATE = "IDLE"
+    
+    if DASHBOARD_AVAILABLE and fishing_metrics:
+        fishing_metrics.stop_session()
+    
+    log_info("Bot STOPPED")
 
 # ==========================================
 # ИНТЕРФЕЙС
@@ -186,12 +268,20 @@ with dpg.window(label="Albion Fisher v2.0 by xietoru", width=580, height=620):
     dpg.add_button(label="4. Set Move Point (Space)", callback=lambda: threading.Thread(target=lambda: globals().update(move_spot=get_point())).start(), width=250)
     
     dpg.add_separator()
+    
+    # Dashboard toggle
+    if DASHBOARD_AVAILABLE:
+        with dpg.group(horizontal=True):
+            dpg.add_button(label="🎮 SHOW DASHBOARD", callback=toggle_dashboard, width=250, height=40)
+            dpg.add_text("Gaming metrics & stats!", color=(0, 255, 255, 255))
+        dpg.add_separator()
+    
     dpg.add_input_int(label="Volume Threshold", default_value=5000, tag="vol_input")
     dpg.add_input_float(label="Detection Sens", default_value=0.5, tag="det_input")
     
     with dpg.group(horizontal=True):
-        dpg.add_button(label="START", callback=lambda: (globals().update(STATE="STARTED", stop_button=False), threading.Thread(target=audio_loop, daemon=True).start(), threading.Thread(target=action_loop, daemon=True).start()), width=120, height=40)
-        dpg.add_button(label="STOP", callback=lambda: globals().update(stop_button=True, STATE="IDLE"), width=120, height=40)
+        dpg.add_button(label="START", callback=start_bot_with_metrics, width=120, height=40)
+        dpg.add_button(label="STOP", callback=stop_bot_with_metrics, width=120, height=40)
 
     with dpg.child_window(tag="log_window", height=180):
         dpg.add_group(tag="log_group")
@@ -200,5 +290,10 @@ dpg.create_viewport(title='Fisherman v13.0', width=600, height=650)
 dpg.setup_dearpygui(); dpg.show_viewport()
 while dpg.is_dearpygui_running():
     dpg.set_viewport_title(f"Fisherman v13.0 | Vol: {total_vol} | Fish: {fish_count} | {STATE}")
+    
+    # Update dashboard if visible
+    if show_dashboard and dashboard_instance and DASHBOARD_AVAILABLE:
+        dashboard_instance.update_dashboard()
+    
     dpg.render_dearpygui_frame()
 dpg.destroy_context()

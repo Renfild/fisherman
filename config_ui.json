@@ -1,0 +1,67 @@
+{
+  "theme": "cyberpunk",
+  "colors": {
+    "primary": [0, 255, 255, 255],
+    "secondary": [255, 0, 255, 255],
+    "accent": [255, 215, 0, 255],
+    "background": [10, 10, 20, 255],
+    "panel": [25, 25, 45, 255],
+    "text": [255, 255, 255, 255]
+  },
+  "animations": {
+    "enabled": true,
+    "pulse_speed": 2.0,
+    "fade_speed": 0.5
+  },
+  "sounds": {
+    "enabled": true,
+    "volume": 0.8
+  },
+  "dashboard": {
+    "width": 1200,
+    "height": 800,
+    "refresh_rate": 0.1,
+    "show_fps": false
+  },
+  "metrics": {
+    "fish_per_hour": {
+      "enabled": true,
+      "visible": true
+    },
+    "success_rate": {
+      "enabled": true,
+      "visible": true
+    },
+    "average_catch_time": {
+      "enabled": true,
+      "visible": true
+    },
+    "uptime": {
+      "enabled": true,
+      "visible": true
+    },
+    "audio_spectrum": {
+      "enabled": true,
+      "visible": true,
+      "bars": 32
+    },
+    "estimated_value": {
+      "enabled": true,
+      "visible": true
+    },
+    "mastery": {
+      "enabled": true,
+      "visible": true
+    }
+  },
+  "achievements": {
+    "enabled": true,
+    "notifications": true
+  },
+  "tabs": {
+    "main": true,
+    "stats": true,
+    "achievements": true,
+    "settings": true
+  }
+}
