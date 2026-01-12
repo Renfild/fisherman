@@ -136,20 +136,22 @@ class FishingMetrics:
             
     def get_mastery_title(self) -> str:
         """Получить название уровня мастерства"""
-        titles = ["Новичок", "Опытный", "Мастер", "Легенда"]
-        return titles[self.mastery_level]
+        with self.lock:
+            titles = ["Новичок", "Опытный", "Мастер", "Легенда"]
+            return titles[self.mastery_level]
         
     def get_mastery_progress(self) -> float:
         """Получить прогресс до следующего уровня (0-1)"""
-        thresholds = [0, 100, 300, 700, 1000]
-        current_threshold = thresholds[self.mastery_level]
-        next_threshold = thresholds[min(self.mastery_level + 1, len(thresholds) - 1)]
-        
-        if self.mastery_level >= 3:
-            return 1.0  # Максимальный уровень
+        with self.lock:
+            thresholds = [0, 100, 300, 700, 1000]
+            current_threshold = thresholds[self.mastery_level]
+            next_threshold = thresholds[min(self.mastery_level + 1, len(thresholds) - 1)]
             
-        progress = (self.mastery_exp - current_threshold) / (next_threshold - current_threshold)
-        return max(0.0, min(1.0, progress))
+            if self.mastery_level >= 3:
+                return 1.0  # Максимальный уровень
+                
+            progress = (self.mastery_exp - current_threshold) / (next_threshold - current_threshold)
+            return max(0.0, min(1.0, progress))
         
     def get_fish_per_hour(self) -> float:
         """Рассчитать рыб в час"""
@@ -211,17 +213,54 @@ class FishingMetrics:
         
     def get_stats_dict(self) -> Dict:
         """Получить все статистики в виде словаря"""
-        # Call methods that use locks first, before acquiring lock
-        fish_per_hour = self.get_fish_per_hour()
-        success_rate = self.get_success_rate()
-        avg_catch_time = self.get_average_catch_time()
-        uptime = self.get_uptime()
-        total_time = self.get_total_time()
-        downtime = total_time - uptime
-        mastery_title = self.get_mastery_title()
-        mastery_progress = self.get_mastery_progress()
-        
         with self.lock:
+            # Calculate fish per hour
+            if len(self.catch_history) < 2:
+                fish_per_hour = 0.0
+            else:
+                now = time.time()
+                recent_catches = [t for t in self.catch_history if now - t < 3600]
+                if len(recent_catches) < 2:
+                    if self.catch_history:
+                        time_span = now - self.catch_history[0]
+                        fish_per_hour = (len(self.catch_history) / time_span) * 3600 if time_span > 0 else 0.0
+                    else:
+                        fish_per_hour = 0.0
+                else:
+                    time_span = now - recent_catches[0]
+                    fish_per_hour = (len(recent_catches) / time_span) * 3600 if time_span > 0 else 0.0
+            
+            # Calculate success rate
+            success_rate = (self.total_catches / self.total_attempts) * 100 if self.total_attempts > 0 else 0.0
+            
+            # Calculate average catch time
+            avg_catch_time = sum(self.catch_times) / len(self.catch_times) if self.catch_times else 0.0
+            
+            # Calculate uptime
+            uptime = self.active_time
+            if self.is_active and self.last_state_change:
+                uptime += time.time() - self.last_state_change
+            
+            # Calculate total time
+            total_time = time.time() - self.session_start if self.session_start else 0.0
+            
+            # Calculate downtime
+            downtime = total_time - uptime
+            
+            # Get mastery title
+            titles = ["Новичок", "Опытный", "Мастер", "Легенда"]
+            mastery_title = titles[self.mastery_level]
+            
+            # Get mastery progress
+            thresholds = [0, 100, 300, 700, 1000]
+            current_threshold = thresholds[self.mastery_level]
+            next_threshold = thresholds[min(self.mastery_level + 1, len(thresholds) - 1)]
+            if self.mastery_level >= 3:
+                mastery_progress = 1.0
+            else:
+                mastery_progress = (self.mastery_exp - current_threshold) / (next_threshold - current_threshold)
+                mastery_progress = max(0.0, min(1.0, mastery_progress))
+            
             return {
                 'total_catches': self.total_catches,
                 'total_attempts': self.total_attempts,
